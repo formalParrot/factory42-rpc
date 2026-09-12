@@ -2,320 +2,339 @@ $ErrorActionPreference = "Stop"
 
 $Repo = "https://github.com/formalParrot/factory42-rpc.git"
 $AppName = "factory42"
-$AppDir = Join-Path $HOME "factory42-rpc"
+$AppDir = Join-Path $env:USERPROFILE "factory42-rpc"
 
 Write-Host ""
-Write-Host "=========================================="
-Write-Host " Factory 42 Rich Presence Installer"
-Write-Host "=========================================="
+Write-Host "========================================="
+Write-Host " Factory 42 Discord Rich Presence"
+Write-Host " Windows Installer"
+Write-Host "========================================="
 Write-Host ""
 
-# ==========================================
+# ------------------------------------------------------------
+# Helper functions
+# ------------------------------------------------------------
+
+function Require-Command {
+    param (
+        [string]$Command,
+        [string]$Name
+    )
+
+    if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
+        throw "$Name was not found in PATH."
+    }
+}
+
+function Refresh-Path {
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+
+    $env:Path = "$machinePath;$userPath"
+}
+
+# ------------------------------------------------------------
 # Check winget
-# ==========================================
+# ------------------------------------------------------------
 
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] winget is not available."
-    Write-Host ""
-    Write-Host "Windows App Installer / winget is required."
-    Write-Host "Install it through Microsoft Store, then run this script again."
-    exit 1
+Write-Host "[1/8] Checking winget..."
+
+if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+    throw "winget is not installed. Install App Installer from Microsoft Store first."
 }
 
-Write-Host "[+] winget available."
+Write-Host "winget found."
 
-# ==========================================
-# Check / install Git
-# ==========================================
+# ------------------------------------------------------------
+# Install Git
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "[*] Checking Git..."
+Write-Host "[2/8] Checking Git..."
 
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command git.exe -ErrorAction SilentlyContinue)) {
+    Write-Host "Git is missing. Installing Git..."
 
-    Write-Host "[!] Git is not installed."
-    Write-Host "[*] Installing Git..."
-
-    winget install Git.Git `
-        --accept-source-agreements `
+    winget install `
+        --id Git.Git `
+        --exact `
         --accept-package-agreements `
+        --accept-source-agreements `
         --silent
 
-    Write-Host "[*] Refreshing PATH..."
-
-    $env:Path =
-        [Environment]::GetEnvironmentVariable("Path", "Machine") +
-        ";" +
-        [Environment]::GetEnvironmentVariable("Path", "User")
+    Refresh-Path
 }
 
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+Require-Command "git.exe" "Git"
 
-    $GitPath = "C:\Program Files\Git\cmd"
+Write-Host "Git: $(git --version)"
 
-    if (Test-Path "$GitPath\git.exe") {
-        $env:Path = "$GitPath;$env:Path"
-    }
-}
-
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] Git installation failed or PATH was not refreshed."
-    Write-Host "Restart PowerShell and run the installer again."
-    exit 1
-}
-
-Write-Host "[+] Git: $(git --version)"
-
-# ==========================================
-# Check / install Node.js
-# ==========================================
+# ------------------------------------------------------------
+# Install Node.js
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "[*] Checking Node.js..."
+Write-Host "[3/8] Checking Node.js..."
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) {
+    Write-Host "Node.js is missing. Installing Node.js LTS..."
 
-    Write-Host "[!] Node.js is not installed."
-    Write-Host "[*] Installing Node.js LTS..."
-
-    winget install OpenJS.NodeJS.LTS `
-        --accept-source-agreements `
+    winget install `
+        --id OpenJS.NodeJS.LTS `
+        --exact `
         --accept-package-agreements `
+        --accept-source-agreements `
         --silent
 
-    Write-Host "[*] Refreshing PATH..."
-
-    $env:Path =
-        [Environment]::GetEnvironmentVariable("Path", "Machine") +
-        ";" +
-        [Environment]::GetEnvironmentVariable("Path", "User")
+    Refresh-Path
 }
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+Require-Command "node.exe" "Node.js"
+Require-Command "npm.cmd" "npm"
 
-    $NodePath = "C:\Program Files\nodejs"
+Write-Host "Node: $(node --version)"
+Write-Host "npm:  $(npm --version)"
 
-    if (Test-Path "$NodePath\node.exe") {
-        $env:Path = "$NodePath;$env:Path"
-    }
-}
-
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] Node.js installation failed."
-    Write-Host "Restart PowerShell and run the installer again."
-    exit 1
-}
-
-Write-Host "[+] Node.js: $(node --version)"
-
-# ==========================================
-# Check npm
-# ==========================================
-
-Write-Host ""
-Write-Host "[*] Checking npm..."
-
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-
-    $NodePath = "C:\Program Files\nodejs"
-
-    if (Test-Path "$NodePath\npm.cmd") {
-        $env:Path = "$NodePath;$env:Path"
-    }
-}
-
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] npm could not be found."
-    exit 1
-}
-
-Write-Host "[+] npm: $(npm --version)"
-
-# ==========================================
+# ------------------------------------------------------------
 # Clone / update repository
-# ==========================================
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "[*] Preparing repository..."
+Write-Host "[4/8] Setting up repository..."
 
-if (Test-Path (Join-Path $AppDir ".git")) {
+if (Test-Path $AppDir) {
 
-    Write-Host "[+] Repository already exists."
+    Write-Host "Repository directory already exists:"
+    Write-Host "  $AppDir"
 
-    Set-Location $AppDir
+    if (-not (Test-Path (Join-Path $AppDir ".git"))) {
+        throw "$AppDir exists but is not a Git repository."
+    }
 
-    Write-Host "[*] Pulling latest changes..."
-    git pull --ff-only
+    Push-Location $AppDir
 
-}
-elseif (Test-Path $AppDir) {
+    Write-Host "Updating repository..."
 
-    Write-Host "[!] $AppDir already exists but is not a Git repository."
-    Write-Host "[!] Refusing to overwrite it."
-    exit 1
+    git fetch origin
+    git reset --hard origin/main
 
-}
-else {
+    Pop-Location
 
-    Write-Host "[*] Cloning repository..."
+} else {
+
+    Write-Host "Cloning repository..."
+    Write-Host "  $Repo"
+    Write-Host "  -> $AppDir"
 
     git clone $Repo $AppDir
-
-    Set-Location $AppDir
 }
 
-# ==========================================
-# Install dependencies
-# ==========================================
+# ------------------------------------------------------------
+# Verify repository
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "[*] Installing npm dependencies..."
+Write-Host "[5/8] Verifying repository..."
+
+if (-not (Test-Path $AppDir)) {
+    throw "Repository directory was not created: $AppDir"
+}
+
+$IndexFile = Join-Path $AppDir "index.js"
+
+if (-not (Test-Path $IndexFile)) {
+    Write-Host ""
+    Write-Host "Repository contents:"
+    Get-ChildItem $AppDir | Format-Table Name, Length
+    Write-Host ""
+
+    throw "index.js was not found in $AppDir"
+}
+
+Write-Host "Repository OK."
+Write-Host "index.js found."
+
+# ------------------------------------------------------------
+# Install npm dependencies
+# ------------------------------------------------------------
+
+Write-Host ""
+Write-Host "[6/8] Installing npm dependencies..."
+
+Push-Location $AppDir
+
+if (-not (Test-Path (Join-Path $AppDir "package.json"))) {
+    Pop-Location
+    throw "package.json was not found."
+}
 
 npm install
 
-Write-Host "[+] Dependencies installed."
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    throw "npm install failed."
+}
 
-# ==========================================
+Pop-Location
+
+Write-Host "npm install completed."
+
+# ------------------------------------------------------------
 # Ask for token
-# ==========================================
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "=========================================="
-Write-Host " Factory 42 API Token"
-Write-Host "=========================================="
+Write-Host "[7/8] Configuring Factory 42 token..."
 Write-Host ""
 
-$SecureToken = Read-Host "FACTORY_42_TOKEN" -AsSecureString
+$SecureToken = Read-Host "Enter FACTORY_42_TOKEN" -AsSecureString
 
-$BSTR = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureToken)
+$TokenPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR(
+    $SecureToken
+)
 
 try {
-    $Token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($BSTR)
+    $Token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($TokenPtr)
 }
 finally {
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($TokenPtr)
 }
 
 if ([string]::IsNullOrWhiteSpace($Token)) {
-    Write-Host "[!] Token cannot be empty."
-    exit 1
+    throw "FACTORY_42_TOKEN cannot be empty."
 }
 
-@"
-FACTORY_42_TOKEN='$Token'
-"@ | Set-Content -Path ".env" -Encoding UTF8
+$EnvFile = Join-Path $AppDir ".env"
 
-Write-Host "[+] .env created."
+"FACTORY_42_TOKEN='$Token'" | Set-Content `
+    -Path $EnvFile `
+    -Encoding UTF8 `
+    -NoNewline
 
-# ==========================================
+Write-Host ".env created."
+
+# ------------------------------------------------------------
 # Install PM2
-# ==========================================
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "[*] Checking PM2..."
+Write-Host "[8/8] Installing and configuring PM2..."
 
-if (-not (Get-Command pm2 -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command pm2.cmd -ErrorAction SilentlyContinue)) {
 
-    Write-Host "[!] PM2 is not installed."
-    Write-Host "[*] Installing PM2 globally..."
+    Write-Host "Installing PM2 globally..."
 
     npm install -g pm2
 
-    $NpmPrefix = npm prefix -g
+    if ($LASTEXITCODE -ne 0) {
+        throw "PM2 installation failed."
+    }
 
-    $env:Path = "$NpmPrefix;$env:Path"
+    Refresh-Path
 }
 
-if (-not (Get-Command pm2 -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] PM2 was installed but could not be found."
-    Write-Host "Restart PowerShell and run the installer again."
-    exit 1
-}
+Require-Command "pm2.cmd" "PM2"
 
-Write-Host "[+] PM2: $(pm2 --version)"
+Write-Host "PM2: $(pm2 --version)"
 
-# ==========================================
-# Remove existing process
-# ==========================================
-
-Write-Host ""
-Write-Host "[*] Checking existing PM2 process..."
-
-$ExistingProcess = pm2 describe $AppName 2>$null
-
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "[*] Existing process found."
-    pm2 delete $AppName
-}
-
-# ==========================================
+# ------------------------------------------------------------
 # Start application
-# ==========================================
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "[*] Starting Factory 42 Rich Presence..."
+Write-Host "Starting Factory 42 RPC..."
 
-Set-Location $AppDir
+Push-Location $AppDir
 
+# Remove an old instance if one exists.
+pm2 delete $AppName 2>$null
+
+# Start EXACTLY the requested application.
 pm2 start index.js --name factory42
 
-# ==========================================
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    throw "PM2 failed to start index.js."
+}
+
+Pop-Location
+
 # Save PM2 process list
-# ==========================================
-
 Write-Host ""
-Write-Host "[*] Saving PM2 process list..."
+Write-Host "Saving PM2 process list..."
 
 pm2 save
 
-# ==========================================
-# Configure Windows startup
-# ==========================================
+if ($LASTEXITCODE -ne 0) {
+    throw "pm2 save failed."
+}
+
+# ------------------------------------------------------------
+# Windows startup
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "=========================================="
-Write-Host " Windows Startup"
-Write-Host "=========================================="
-Write-Host ""
+Write-Host "Configuring Windows startup..."
 
-pm2 save
+$StartupDir = Join-Path `
+    $env:APPDATA `
+    "Microsoft\Windows\Start Menu\Programs\Startup"
 
-$StartupDir = [Environment]::GetFolderPath("Startup")
+if (-not (Test-Path $StartupDir)) {
+    New-Item -ItemType Directory -Path $StartupDir -Force | Out-Null
+}
+
 $StartupFile = Join-Path $StartupDir "factory42-pm2.cmd"
-
-$NpmPath = (Get-Command npm.cmd).Source
 
 @"
 @echo off
+set "PATH=C:\Program Files\nodejs;%APPDATA%\npm;%PATH%"
 cd /d "$AppDir"
-"$NpmPath" exec -- pm2 resurrect
-"@ | Set-Content -Path $StartupFile -Encoding ASCII
+call pm2 resurrect
+"@ | Set-Content `
+    -Path $StartupFile `
+    -Encoding ASCII
 
-Write-Host "[+] Windows startup entry created:"
-Write-Host "    $StartupFile"
+Write-Host "Startup file created:"
+Write-Host "  $StartupFile"
 
-# ==========================================
-# Verify
-# ==========================================
+# ------------------------------------------------------------
+# Final verification
+# ------------------------------------------------------------
 
 Write-Host ""
-Write-Host "=========================================="
-Write-Host " Installation complete"
-Write-Host "=========================================="
+Write-Host "========================================="
+Write-Host " Verification"
+Write-Host "========================================="
 Write-Host ""
 
+Write-Host "Application directory:"
+Write-Host "  $AppDir"
+
+Write-Host ""
+Write-Host "index.js:"
+Write-Host "  $IndexFile"
+
+Write-Host ""
+Write-Host "PM2 status:"
 pm2 status
 
 Write-Host ""
-Write-Host "Application:"
-Write-Host "  $AppDir"
+Write-Host "Recent application logs:"
+pm2 logs $AppName --lines 20 --nostream
+
 Write-Host ""
-Write-Host "PM2 name:"
-Write-Host "  $AppName"
+Write-Host "========================================="
+Write-Host " Installation complete"
+Write-Host "========================================="
+Write-Host ""
+
+Write-Host "Factory 42 RPC is running under PM2."
 Write-Host ""
 Write-Host "Useful commands:"
 Write-Host "  pm2 status"
 Write-Host "  pm2 logs factory42"
 Write-Host "  pm2 restart factory42"
 Write-Host "  pm2 stop factory42"
+Write-Host "  pm2 delete factory42"
 Write-Host ""
