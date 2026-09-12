@@ -278,6 +278,9 @@ Write-Host " Windows Startup"
 Write-Host "=========================================="
 Write-Host ""
 
+# PM2 stores the saved process list here.
+pm2 save
+
 $StartupDir = [Environment]::GetFolderPath("Startup")
 $StartupFile = Join-Path $StartupDir "factory42-pm2.cmd"
 
@@ -289,8 +292,10 @@ cd /d "$AppDir"
 "$Pm2Command" resurrect
 "@ | Set-Content -Path $StartupFile -Encoding ASCII
 
-Write-Host "[+] Windows startup entry created."
+Write-Host "[+] Windows startup entry created:"
 Write-Host "    $StartupFile"
+Write-Host ""
+Write-Host "[+] factory42 will be restored by PM2 when you log into Windows."
 
 # ==========================================
 # Verify
