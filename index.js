@@ -44,7 +44,7 @@ async function updatePresence() {
     const playerCount = server.playerCount ?? 0;
 
     rpc.setActivity({
-      details: "Playing Factory 42",
+      details: "Minecraft SMP",
       state: `${playerCount} player${playerCount === 1 ? "" : "s"} online`,
       largeImageKey: "factory42",
       largeImageText: "Factory 42 SMP"
