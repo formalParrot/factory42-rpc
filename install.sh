@@ -2,7 +2,7 @@
 
 set -e
 
-REPO="https://github.com/formalParrot/factory42-rpc.git"
+REPO="git@github.com:formalParrot/factory42-rpc.git"
 APP_NAME="factory42"
 APP_DIR="$HOME/factory42-rpc"
 
